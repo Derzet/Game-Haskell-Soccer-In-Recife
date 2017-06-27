@@ -17,7 +17,7 @@ import Graphics.UI.Fungen
 import Graphics.Rendering.OpenGL (GLdouble)
 import Paths_FunGEn (getDataFileName)
 
-data GameAttribute = GA Int Int Int (GLdouble,GLdouble) Int
+data GameAttribute = GA Int Bool (GLdouble,GLdouble) Int
 data ObjectAttribute = NoObjectAttribute | Tail Int
 data GameState = LevelStart Int | Level Int | GameOver
 data TileAttribute = NoTileAttribute
@@ -31,61 +31,67 @@ tileSize, speedMod :: GLdouble
 tileSize = 30.0
 speedMod = 30.0
 
-initPos, tail0Pos, tail1Pos :: (GLdouble,GLdouble)
+initPos :: (GLdouble,GLdouble)
 initPos  = (45.0,105.0)
-tail0Pos = (45.0,75.0)
-tail1Pos = (45.0,45.0)
+--GOL OBJETIVO
+objetivo :: Bool
+objetivo = False
 
 maxFood, initTailSize, defaultTimer :: Int
 maxFood = 10
 initTailSize = 2
 defaultTimer = 10
 
-magenta :: InvList
-magenta = Just [(255,0,255)]
+white :: InvList
+white = Just[(255,255,255)]
 
 bmpList :: FilePictureList
 bmpList = [("level1.bmp",          Nothing),
            ("level2.bmp",          Nothing),
            ("level3.bmp",          Nothing),
-           ("gameover.bmp",        magenta),
-           ("congratulations.bmp", magenta),
-           ("bola.bmp",           magenta),
-           ("bola.bmp",           magenta),
-           ("bola.bmp",           magenta),
-           ("bola.bmp",           magenta),
-           ("food.bmp",            magenta),
-           ("segment.bmp",         magenta),
-           ("border1.bmp",         magenta),
-           ("border2.bmp",         magenta),
-           ("border3.bmp",         magenta),
-           ("free1.bmp",           magenta),
-           ("free2.bmp",           magenta),
-           ("free3.bmp",           magenta)]
+           ("gameover.bmp",        Nothing),
+           ("congratulations.bmp", Nothing),
+           ("bola.bmp",           white),
+           ("bola.bmp",           white),
+           ("bola.bmp",           white),
+           ("bola.bmp",           white),
+           ("food.bmp",            Nothing),
+           ("segment.bmp",         Nothing),
+           ("border1.bmp",         Nothing),
+           ("border2.bmp",         Nothing),
+           ("border3.bmp",         Nothing),
+           ("free1.bmp",           Nothing),
+           ("free2.bmp",           Nothing),
+           ("free3.bmp",           Nothing),
+           ("spike.bmp",           Nothing),
+           ("elephant.bmp",        Nothing)]
 
 -- position of the paths in the list:
-border1, border2, border3, free1, free2, free3 :: Int
+border1, border2, border3, free1, bl, br, bu, bd,spike,elephant :: Int
 border1 = 11
 border2 = 12
 border3 = 13
 free1   = 14
-free2   = 15
-free3   = 16
+bl      = 15
+br      = 16
+bu      = 10
+bd      = 12
+spike   = 17
+elephant = 18 
 
 main :: IO ()
 main = do
-  let winConfig = ((200,100),(780,600),"WORMS - by Andre Furtado")
+  let winConfig = ((200,100),(780,600),"PLC - GAME")
 
       gameMap = multiMap [(tileMap map1 tileSize tileSize),
                           (tileMap map2 tileSize tileSize),
                           (tileMap map3 tileSize tileSize)] 0
 
-      gameAttribute = GA defaultTimer maxFood initTailSize initPos 0
+      gameAttribute = GA defaultTimer objetivo initPos 0
 
       groups = [(objectGroup "messages"  createMsgs ),
                 (objectGroup "head"     [createHead]),
-                (objectGroup "food"     [createFood]),
-                (objectGroup "tail"      createTail )]
+                (objectGroup "food"     [createFood])]
 
       input = [
                (SpecialKey KeyLeft,  Press, turnLeft ),
@@ -95,7 +101,7 @@ main = do
               ,(Char 'q',            Press, \_ _ -> funExit)
               ]
   
-  bmpList' <- mapM (\(a,b) -> do { a' <- getDataFileName ("examples/worms/"++a); return (a', b)}) bmpList
+  bmpList' <- mapM (\(a,b) -> do { a' <- getDataFileName ("examples/jgm/"++a); return (a', b)}) bmpList
   funInit winConfig gameMap groups (LevelStart 1) gameAttribute input gameCycle (Timer 150) bmpList'
 
 createMsgs :: [WormsObject]
@@ -117,48 +123,58 @@ createHead = let pic = Tex (tileSize,tileSize) 5
 
 createFood :: WormsObject
 createFood = let pic = Tex (tileSize,tileSize) 9
-             in object "food" pic True (0,0) (0,0) NoObjectAttribute
+             in object "food" pic True (0,0) (0,0) NoObjectAttribute 
 
-createTail :: [WormsObject]
-createTail = let picTail = Tex (tileSize,tileSize) 10
-             in (object "tail0"  picTail False tail0Pos (0,0) (Tail 0)):
-                (object "tail1"  picTail False tail1Pos (0,0) (Tail 1)):
-                (createAsleepTails initTailSize (initTailSize + maxFood - 1) picTail)
-
-createAsleepTails :: Int -> Int -> ObjectPicture -> [WormsObject]
-createAsleepTails tMin tMax pic
-  | (tMin > tMax) = []
-  | otherwise = (object ("tail" ++ (show tMin)) pic True (0,0) (0,0) (Tail 0)):(createAsleepTails (tMin + 1) tMax pic)
 
 turnLeft :: Modifiers -> Position -> WormsAction ()
 turnLeft _ _ = do
   snakeHead <- findObject "head" "head"
   setObjectCurrentPicture 8 snakeHead
-  setObjectSpeed (-speedMod,0) snakeHead
+  headPos <- getObjectPosition snakeHead
+  tile <- getTileFromWindowPosition headPos
+  if ((getTilePictureIndex tile) == 15)
+	then do stop
+	else do setObjectSpeed (-speedMod,0) snakeHead
     
 turnRight :: Modifiers -> Position -> WormsAction ()
 turnRight _ _ = do
   snakeHead <- findObject "head" "head"
   setObjectCurrentPicture 7 snakeHead
-  setObjectSpeed (speedMod,0) snakeHead
+  headPos <- getObjectPosition snakeHead
+  tile <- getTileFromWindowPosition headPos
+  if ((getTilePictureIndex tile) == 16)
+	then do stop
+	else do setObjectSpeed (speedMod,0) snakeHead
 
 turnUp :: Modifiers -> Position -> WormsAction ()
 turnUp _ _ = do
   snakeHead <- findObject "head" "head"
   setObjectCurrentPicture 5 snakeHead
-  setObjectSpeed (0,speedMod) snakeHead
+  headPos <- getObjectPosition snakeHead
+  tile <- getTileFromWindowPosition headPos
+  if ((getTilePictureIndex tile) == 10)
+	then do stop
+	else do setObjectSpeed (0,speedMod) snakeHead
 
 turnDown :: Modifiers -> Position -> WormsAction ()
 turnDown _ _ = do
   snakeHead <- findObject "head" "head"
   setObjectCurrentPicture 6 snakeHead
-  setObjectSpeed (0,-speedMod) snakeHead
+  headPos <- getObjectPosition snakeHead
+  tile <- getTileFromWindowPosition headPos
+  if ((getTilePictureIndex tile) == 12)
+	then do stop
+	else do setObjectSpeed (0,-speedMod) snakeHead
 
+stop :: WormsAction ()
+stop = do
+  snakeHead <- findObject "head" "head"
+  setObjectSpeed (0,0) snakeHead
 
 
 gameCycle :: WormsAction ()
 gameCycle = do
-  (GA timer remainingFood tailSize previousHeadPos score) <- getGameAttribute
+  (GA timer objetivo previousHeadPos score) <- getGameAttribute
   gState <- getGameState
   case gState of
       LevelStart n -> case n of
@@ -167,7 +183,7 @@ gameCycle = do
                               drawObject congratulations
                               if (timer == 0)
                                   then funExit
-                                  else (setGameAttribute (GA (timer - 1) remainingFood tailSize previousHeadPos score))
+                                  else (setGameAttribute (GA (timer - 1) objetivo previousHeadPos score))
                         _ -> do
                               disableGameFlags
                               level <- findObject ("level" ++ (show n)) "messages"
@@ -180,17 +196,26 @@ gameCycle = do
                                            setObjectPosition initPos snakeHead
                                            setObjectSpeed (0.0,speedMod) snakeHead
                                            setObjectCurrentPicture 5 snakeHead
-                                           setGameAttribute (GA defaultTimer remainingFood tailSize previousHeadPos score)
+                                           setGameAttribute (GA defaultTimer objetivo previousHeadPos score)
                                            destroyObject level
                                            setNewMap n)
-                                  else setGameAttribute (GA (timer - 1) remainingFood tailSize previousHeadPos score)
+                                  else setGameAttribute (GA (timer - 1) objetivo previousHeadPos score)
       Level n -> do
-                  if (remainingFood == 0) -- advance level!
+                  snakeHead <- findObject "head" "head"
+                  if (objetivo==True) -- advance level!
                       then  (do setGameState (LevelStart (n + 1))
-                                resetTails
                                 disableGameFlags
-                                setGameAttribute (GA timer maxFood initTailSize initPos score))
-                      else if (timer == 0) -- put a new food in the map
+                                setGameAttribute (GA timer False initPos score)
+				)
+                                else (do checkSnakeCollision snakeHead
+					 headPos <- getObjectPosition snakeHead
+ 					 tile <- getTileFromWindowPosition headPos
+ 					 if((getTilePictureIndex tile)==18) 
+                                           then setGameAttribute(GA timer True initPos score)
+				     	   else return () 
+				)
+                 
+  {-                    else if (timer == 0) -- put a new food in the map
                              then (do food <- findObject "food" "food"
                                       newPos <- createNewFoodPosition
                                       setObjectPosition newPos food
@@ -198,15 +223,11 @@ gameCycle = do
                                       setObjectAsleep False newFood
                                       setGameAttribute (GA (-1) remainingFood tailSize previousHeadPos score)
                                       snakeHead <- findObject "head" "head"
-                                      {-checkSnakeCollision snakeHead-}
-                                      snakeHeadPosition <- getObjectPosition snakeHead
-                                      moveTail snakeHeadPosition)
+                                      checkSnakeCollision snakeHead )
                              else if (timer > 0) -- there is no food in the map, so decrease the food timer
                                    then (do setGameAttribute (GA (timer - 1) remainingFood tailSize previousHeadPos score)
                                             snakeHead <- findObject "head" "head"
-                                            --checkSnakeCollision snakeHead
-                                            snakeHeadPosition <- getObjectPosition snakeHead
-                                            moveTail snakeHeadPosition)
+                                            checkSnakeCollision snakeHead )
                                    else (do -- there is a food in the map
                                       food <- findObject "food" "food"
                                       snakeHead <- findObject "head" "head"
@@ -216,9 +237,8 @@ gameCycle = do
                                                    setGameAttribute (GA defaultTimer (remainingFood-1) (tailSize + 1) snakeHeadPosition (score + 1))
                                                    --addTail previousHeadPos
                                                    setObjectAsleep True food)
-                                          else (do snakeHeadPosition <- getObjectPosition snakeHead
-                                                   moveTail snakeHeadPosition))
-                  showScore
+                                          else checkSnakeCollision snakeHead) 
+                  showScore -}
 
       GameOver -> do
                       disableMapDrawing
@@ -227,120 +247,44 @@ gameCycle = do
                       drawObject gameover
                       if (timer == 0)
                               then funExit
-                              else (setGameAttribute (GA (timer - 1) 0 0 (0,0) 0))
+                              else (setGameAttribute (GA (timer - 1) objetivo (0,0) 0))
 
 
-
+{-
 showScore :: WormsAction ()
 showScore = do
   (GA _ remainingFood _ _ score) <- getGameAttribute
   printOnScreen (printf "Score: %d    Food remaining: %d" score remainingFood) TimesRoman24 (40,8) 1.0 1.0 1.0
   showFPS TimesRoman24 (780-60,8) 1.0 0.0 0.0
-
+-}
 setNewMap :: Int -> WormsAction ()
 setNewMap 2 = setCurrentMapIndex 1
 setNewMap 3 = setCurrentMapIndex 2
 setNewMap _ = return ()
 
-resetTails :: WormsAction ()
-resetTails = do
-  tail0 <- findObject "tail0" "tail"
-  setObjectPosition tail0Pos tail0
-  setObjectAttribute (Tail 0) tail0
-  tail1 <- findObject "tail1" "tail"
-  setObjectPosition tail1Pos tail1
-  setObjectAttribute (Tail 1) tail1
-  resetOtherTails initTailSize
-
-resetOtherTails :: Int -> WormsAction ()
-resetOtherTails n | (n == initTailSize + maxFood) = return ()
-                  | otherwise = do tailn <- findObject ("tail" ++ (show n)) "tail"
-                                   setObjectAsleep True tailn
-                                   resetOtherTails (n + 1)
-{-
-addTail :: (GLdouble,GLdouble) -> WormsAction ()
-addTail presentHeadPos = do
-  tails <- getObjectsFromGroup "tail"
-  aliveTails <- getAliveTails tails []
-  asleepTail <-  getAsleepTail tails
-  setObjectAsleep False asleepTail
-  setObjectPosition presentHeadPos asleepTail
-  setObjectAttribute (Tail 0) asleepTail
-  addTailNumber aliveTails
--}
-getAliveTails :: [WormsObject] -> [WormsObject] -> WormsAction [WormsObject]
-getAliveTails [] t = return t
-getAliveTails (o:os) t = do
-  sleeping <- getObjectAsleep o
-  if sleeping
-    then getAliveTails os t
-    else getAliveTails os (o:t)
-
-getAsleepTail ::  [WormsObject] ->  WormsAction WormsObject
-getAsleepTail [] = error "the impossible has happened!"
-getAsleepTail (o:os) = do
-  sleeping <- getObjectAsleep o
-  if sleeping
-    then return o
-    else getAsleepTail os
-
-{-
-addTailNumber :: [WormsObject] -> WormsAction ()
-addTailNumber [] = return ()
-addTailNumber (a:as) = do
-  (Tail n) <- getObjectAttribute a
-  setObjectAttribute (Tail (n + 1)) a
-  addTailNumber as
--}
-
-
-moveTail :: (GLdouble,GLdouble) -> WormsAction ()
-moveTail presentHeadPos = do
-  (GA timer remainingFood tailSize previousHeadPos score) <- getGameAttribute
-  tails <- getObjectsFromGroup "tail"
-  aliveTails <- getAliveTails tails []
-  lastTail <- findLastTail aliveTails
-  setObjectPosition previousHeadPos lastTail
-  setGameAttribute (GA timer remainingFood tailSize presentHeadPos score)
-  changeTailsAttribute tailSize aliveTails
-
-findLastTail :: [WormsObject] -> WormsAction WormsObject
-findLastTail [] = error "the impossible has happened!"
-findLastTail (t1:[]) = return t1
-findLastTail (t1:t2:ts) = do (Tail na) <- getObjectAttribute t1
-                             (Tail nb) <- getObjectAttribute t2
-                             if (na > nb)
-                                then findLastTail (t1:ts)
-                                else findLastTail (t2:ts)
-
-changeTailsAttribute :: Int -> [WormsObject] -> WormsAction ()
-changeTailsAttribute _ [] = return ()
-changeTailsAttribute tailSize (a:as) = do
-  Tail n <- getObjectAttribute a
-  setObjectAttribute (Tail (mod (n + 1) tailSize)) a
-  changeTailsAttribute tailSize as
-
+--colisao com espinho é morte
+--colisão com objeto para , determinando chão
 checkSnakeCollision :: WormsObject -> WormsAction ()
 checkSnakeCollision snakeHead = do
   headPos <- getObjectPosition snakeHead
   tile <- getTileFromWindowPosition headPos
-  tails <- getObjectsFromGroup "tail"
-  col <- objectListObjectCollision tails snakeHead
-  if ( (getTileBlocked tile) || col)
+  --tails <- getObjectsFromGroup "tail"
+  --col <- objectListObjectCollision tails snakeHead
+  if ((getTileBlocked tile))
           then (do setGameState GameOver
                    disableObjectsDrawing
                    disableObjectsMoving
-                   setGameAttribute (GA defaultTimer 0 0 (0,0) 0))
-          else return ()
+                   setGameAttribute (GA defaultTimer objetivo (0,0) 0))
+          else if (((getTilePictureIndex tile)==11) || ((getTilePictureIndex tile) == 15) || ((getTilePictureIndex tile) == 16) ||        ((getTilePictureIndex tile) == 10) || ((getTilePictureIndex tile) == 12))
+          then stop
+          else return()
 
 createNewFoodPosition :: WormsAction (GLdouble,GLdouble)
 createNewFoodPosition = do
   x <- randomInt (1,18)
   y <- randomInt (1,24)
   mapPositionOk <- checkMapPosition (x,y)
-  tails <- getObjectsFromGroup "tail"
-  tailPositionNotOk <- pointsObjectListCollision (toPixelCoord y) (toPixelCoord x) tileSize tileSize tails
-  if (mapPositionOk && not tailPositionNotOk)
+  if (mapPositionOk)
       then (return (toPixelCoord y,toPixelCoord x))
       else createNewFoodPosition
   where toPixelCoord a = (tileSize/2) + (fromIntegral a) * tileSize
@@ -350,76 +294,78 @@ checkMapPosition (x,y) = do
   mapTile <- getTileFromIndex (x,y)
   return (not (getTileBlocked mapTile))
 
-b,f,g,h,i,j,d :: WormsTile
-b = (border1, True,  0.0, NoTileAttribute)
+b,f,s,x,y,w,z,gol :: WormsTile
+b = (border1, False,  0.0, NoTileAttribute) --cost 1 chão
 f = (free1,   False, 0.0, NoTileAttribute)
-g = (border2, True,  0.0, NoTileAttribute)
-h = (free2,   False, 0.0, NoTileAttribute)
-i = (border3, True,  0.0, NoTileAttribute)
-j = (free3,   False, 0.0, NoTileAttribute)
-d = (border2,True,0.0,NoTileAttribute)
+s = (spike,True,0.0,NoTileAttribute)
+x= (bl,False,0.0,NoTileAttribute)
+y= (br,False,0.0,NoTileAttribute)
+w= (bu,False,0.0,NoTileAttribute)
+z= (bd,False,0.0,NoTileAttribute)
+gol = (elephant,False,0.0,NoTileAttribute)
 map1 :: WormsMap
-map1 = [[b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,d,d,d,d,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,b],
-        [b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b]]
+map1 = [[b,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,b],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,s,s,s,s,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,gol,y],
+        [b,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,b]]
 
 map2 :: WormsMap
-map2 = [[g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,g,g,g,g,g,g,g,g,g,g,g,g,g,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,g,g,g,g,g,g,g,g,g,g,g,g,g,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g],
-        [g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g]]
+map2 = [[b,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,b],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,s,s,s,s,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,gol,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [b,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,b]]
 
 map3 :: WormsMap
-map3 = [[i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i],
-        [i,j,j,j,j,j,j,i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,i,i,i,i,i,i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,i,i,i,i,i,i,i,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i,j,j,j,j,j,j,j,i],
-        [i,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,i,j,j,j,j,j,j,j,i],
-        [i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i]]
+map3 = [[b,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,b],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,s,s,s,s,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,gol,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [b,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,b]]
+
