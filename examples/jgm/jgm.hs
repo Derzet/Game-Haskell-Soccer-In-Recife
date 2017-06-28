@@ -1,13 +1,6 @@
 {- 
-
-worms - a very simple FunGEn example.
 http://www.cin.ufpe.br/~haskell/fungen
 Copyright (C) 2001  Andre Furtado <awbf@cin.ufpe.br>
-
-This code is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
 -}
 
 module Main where
@@ -18,32 +11,35 @@ import Graphics.Rendering.OpenGL (GLdouble)
 import Paths_FunGEn (getDataFileName)
 
 data GameAttribute = GA Int Bool (GLdouble,GLdouble) Int
-data ObjectAttribute = NoObjectAttribute | Tail Int
+data ObjectAttribute = NoObjectAttribute 
 data GameState = LevelStart Int | Level Int | GameOver
 data TileAttribute = NoTileAttribute
 
-type WormsAction a = IOGame GameAttribute ObjectAttribute GameState TileAttribute a
-type WormsObject = GameObject ObjectAttribute
-type WormsTile = Tile TileAttribute
-type WormsMap = TileMatrix TileAttribute
+type JGMAction a = IOGame GameAttribute ObjectAttribute GameState TileAttribute a
+type JGMObject = GameObject ObjectAttribute
+type JGMTile = Tile TileAttribute
+type JGMMap = TileMatrix TileAttribute
 
+
+--Tamanho do quadro e velocidade
 tileSize, speedMod :: GLdouble
 tileSize = 30.0
 speedMod = 30.0
 
-initPos :: (GLdouble,GLdouble)
-initPos  = (45.0,105.0)
+--Posição Inicial Bola
+initPos = (40.0,550.0) :: (GLdouble,GLdouble)
+
+
 --GOL OBJETIVO
 objetivo :: Bool
 objetivo = False
 
-maxFood, initTailSize, defaultTimer :: Int
-maxFood = 10
-initTailSize = 2
+defaultTimer :: Int
 defaultTimer = 10
 
-white :: InvList
+white,black :: InvList
 white = Just[(255,255,255)]
+black = Just[(0,0,0)]
 
 bmpList :: FilePictureList
 bmpList = [("level1.bmp",          Nothing),
@@ -60,28 +56,30 @@ bmpList = [("level1.bmp",          Nothing),
            ("border1.bmp",         Nothing),
            ("border2.bmp",         Nothing),
            ("border3.bmp",         Nothing),
-           ("free1.bmp",           Nothing),
+           ("grass.bmp",           Nothing),
            ("free2.bmp",           Nothing),
            ("free3.bmp",           Nothing),
-           ("spike.bmp",           Nothing),
-           ("elephant.bmp",        Nothing)]
+           ("spike.bmp",           white),
+           ("barra.bmp",      Nothing),
+           ("luva.bmp",black)]
 
 -- position of the paths in the list:
-border1, border2, border3, free1, bl, br, bu, bd,spike,elephant :: Int
+border1, border2, border3, grass, bl, br, bu, bd,spike,barra :: Int
 border1 = 11
 border2 = 12
 border3 = 13
-free1   = 14
+grass   = 14
 bl      = 15
 br      = 16
 bu      = 10
 bd      = 12
 spike   = 17
-elephant = 18 
+barra = 18 
+
 
 main :: IO ()
 main = do
-  let winConfig = ((200,100),(780,600),"PLC - GAME")
+  let winConfig = ((200,100),(1050,600),"PLC - GAME - JGM")
 
       gameMap = multiMap [(tileMap map1 tileSize tileSize),
                           (tileMap map2 tileSize tileSize),
@@ -90,9 +88,9 @@ main = do
       gameAttribute = GA defaultTimer objetivo initPos 0
 
       groups = [(objectGroup "messages"  createMsgs ),
-                (objectGroup "head"     [createHead]),
-                (objectGroup "food"     [createFood])]
-
+                (objectGroup "bola"     [createBola]),
+                (objectGroup "luvas"     createLuvas)]
+--ADICIONAR BOTÃO PARAR???
       input = [
                (SpecialKey KeyLeft,  Press, turnLeft ),
                (SpecialKey KeyRight, Press, turnRight),
@@ -104,10 +102,10 @@ main = do
   bmpList' <- mapM (\(a,b) -> do { a' <- getDataFileName ("examples/jgm/"++a); return (a', b)}) bmpList
   funInit winConfig gameMap groups (LevelStart 1) gameAttribute input gameCycle (Timer 150) bmpList'
 
-createMsgs :: [WormsObject]
+createMsgs :: [JGMObject]
 createMsgs =
   let picLevel1          = Tex (150,50)  0
-      picLevel2          = Tex (150,50)  1
+      picLevel2          = Tex (150,50)  1 
       picLevel3          = Tex (150,50)  2
       picGameOver        = Tex (300,100) 3
       picCongratulations = Tex (300,100) 4
@@ -117,64 +115,83 @@ createMsgs =
       (object "gameover"        picGameOver        True (395,300) (0,0) NoObjectAttribute),
       (object "congratulations" picCongratulations True (395,300) (0,0) NoObjectAttribute)]
 
-createHead :: WormsObject
-createHead = let pic = Tex (tileSize,tileSize) 5
-             in object "head" pic True initPos (0,speedMod) NoObjectAttribute
+createBola :: JGMObject
+createBola = let pic = Tex (tileSize,tileSize) 5
+             in object "bola" pic True initPos (0,speedMod) NoObjectAttribute
 
-createFood :: WormsObject
-createFood = let pic = Tex (tileSize,tileSize) 9
-             in object "food" pic True (0,0) (0,0) NoObjectAttribute 
+createLuvas :: [JGMObject]
+createLuvas = let pic = Tex (tileSize*1.5,tileSize*1.5) 19
+           in[(object "luva1" pic True (45.0,405.0) (50,0) NoObjectAttribute),
+              (object "luva2" pic True (45.0,205.0) (50,0) NoObjectAttribute),
+              (object "luva3" pic True (45.0,105.0) (50,0) NoObjectAttribute),
+	      (object "luva4" pic True (305.0,555.0) (50,0) NoObjectAttribute),
+              (object "luva5" pic True (45.0,305.0) (50,0) NoObjectAttribute),
+	      (object "luva6" pic True (205.0,305.0) (0,50) NoObjectAttribute),
+	      (object "luva7" pic True (405.0,550.0) (0,50) NoObjectAttribute)] 
 
+moveLuva:: JGMObject -> JGMAction()
+moveLuva luva = do 
+              luvaPos <- getObjectPosition luva
+	      col1 <- objectLeftMapFutureCollision luva
+              col2 <- objectRightMapFutureCollision luva
+              when (col1 || col2) (reverseXSpeed luva)
+     
+moveLuvaVertical :: JGMObject -> JGMAction()
+moveLuvaVertical luva = do
+	luvaPos <- getObjectPosition luva
+	col1 <- objectTopMapCollision luva
+        col2 <- objectBottomMapCollision luva
+	when (col1 || col2) (reverseYSpeed luva)  	
 
-turnLeft :: Modifiers -> Position -> WormsAction ()
+turnLeft :: Modifiers -> Position -> JGMAction ()
 turnLeft _ _ = do
-  snakeHead <- findObject "head" "head"
-  setObjectCurrentPicture 8 snakeHead
-  headPos <- getObjectPosition snakeHead
-  tile <- getTileFromWindowPosition headPos
+  bola <- findObject "bola" "bola"
+  setObjectCurrentPicture 8 bola
+  bolaPos <- getObjectPosition bola
+  tile <- getTileFromWindowPosition bolaPos
   if ((getTilePictureIndex tile) == 15)
 	then do stop
-	else do setObjectSpeed (-speedMod,0) snakeHead
+	else do setObjectSpeed (-speedMod,0) bola
     
-turnRight :: Modifiers -> Position -> WormsAction ()
+turnRight :: Modifiers -> Position -> JGMAction ()
 turnRight _ _ = do
-  snakeHead <- findObject "head" "head"
-  setObjectCurrentPicture 7 snakeHead
-  headPos <- getObjectPosition snakeHead
-  tile <- getTileFromWindowPosition headPos
+  bola <- findObject "bola" "bola"
+  setObjectCurrentPicture 7 bola
+  bolaPos <- getObjectPosition bola
+  tile <- getTileFromWindowPosition bolaPos
   if ((getTilePictureIndex tile) == 16)
 	then do stop
-	else do setObjectSpeed (speedMod,0) snakeHead
+	else do setObjectSpeed (speedMod,0) bola
 
-turnUp :: Modifiers -> Position -> WormsAction ()
+turnUp :: Modifiers -> Position -> JGMAction ()
 turnUp _ _ = do
-  snakeHead <- findObject "head" "head"
-  setObjectCurrentPicture 5 snakeHead
-  headPos <- getObjectPosition snakeHead
-  tile <- getTileFromWindowPosition headPos
+  bola <- findObject "bola" "bola"
+  setObjectCurrentPicture 5 bola
+  bolaPos <- getObjectPosition bola
+  tile <- getTileFromWindowPosition bolaPos
   if ((getTilePictureIndex tile) == 10)
 	then do stop
-	else do setObjectSpeed (0,speedMod) snakeHead
+	else do setObjectSpeed (0,speedMod) bola
 
-turnDown :: Modifiers -> Position -> WormsAction ()
+turnDown :: Modifiers -> Position -> JGMAction ()
 turnDown _ _ = do
-  snakeHead <- findObject "head" "head"
-  setObjectCurrentPicture 6 snakeHead
-  headPos <- getObjectPosition snakeHead
-  tile <- getTileFromWindowPosition headPos
+  bola <- findObject "bola" "bola"
+  setObjectCurrentPicture 6 bola
+  bolaPos <- getObjectPosition bola
+  tile <- getTileFromWindowPosition bolaPos
   if ((getTilePictureIndex tile) == 12)
 	then do stop
-	else do setObjectSpeed (0,-speedMod) snakeHead
+	else do setObjectSpeed (0,-speedMod) bola
 
-stop :: WormsAction ()
+stop :: JGMAction ()
 stop = do
-  snakeHead <- findObject "head" "head"
-  setObjectSpeed (0,0) snakeHead
+  bola <- findObject "bola" "bola"
+  setObjectSpeed (0,0) bola
 
 
-gameCycle :: WormsAction ()
+gameCycle :: JGMAction ()
 gameCycle = do
-  (GA timer objetivo previousHeadPos score) <- getGameAttribute
+  (GA timer objetivo previousbolaPos score) <- getGameAttribute
   gState <- getGameState
   case gState of
       LevelStart n -> case n of
@@ -183,62 +200,91 @@ gameCycle = do
                               drawObject congratulations
                               if (timer == 0)
                                   then funExit
-                                  else (setGameAttribute (GA (timer - 1) objetivo previousHeadPos score))
-                        _ -> do
+                                  else (setGameAttribute (GA (timer - 1) objetivo previousbolaPos score))
+                        n -> do
                               disableGameFlags
                               level <- findObject ("level" ++ (show n)) "messages"
                               drawObject level
                               if (timer == 0)
                                   then (do setGameState (Level n)
                                            enableGameFlags
-                                           snakeHead <- findObject "head" "head"
-                                           setObjectAsleep False snakeHead
-                                           setObjectPosition initPos snakeHead
-                                           setObjectSpeed (0.0,speedMod) snakeHead
-                                           setObjectCurrentPicture 5 snakeHead
-                                           setGameAttribute (GA defaultTimer objetivo previousHeadPos score)
+                                           bola <- findObject "bola" "bola"
+                                           setObjectAsleep False bola
+                                           setObjectPosition initPos bola
+                                           setObjectSpeed (0.0,0.0) bola
+                                           setObjectCurrentPicture 5 bola 
+                                           setGameAttribute (GA defaultTimer objetivo previousbolaPos score)
                                            destroyObject level
                                            setNewMap n)
-                                  else setGameAttribute (GA (timer - 1) objetivo previousHeadPos score)
+                                  else setGameAttribute (GA (timer - 1) objetivo previousbolaPos score)
+			  
       Level n -> do
-                  snakeHead <- findObject "head" "head"
+                  bola <- findObject "bola" "bola"
                   if (objetivo==True) -- advance level!
                       then  (do setGameState (LevelStart (n + 1))
                                 disableGameFlags
-                                setGameAttribute (GA timer False initPos score)
+                                setGameAttribute (GA timer False initPos score)                                   
 				)
-                                else (do checkSnakeCollision snakeHead
-					 headPos <- getObjectPosition snakeHead
- 					 tile <- getTileFromWindowPosition headPos
+                                else (do checkCollision bola
+                                         when (n==1) (do
+                                           luvaEnemy1 <- findObject "luva1" "luvas"
+                                           moveLuva luvaEnemy1  
+                                           luvaEnemy2 <- findObject "luva2" "luvas" 
+                                           moveLuva luvaEnemy2  
+                                      	   luvaEnemy3 <- findObject "luva3" "luvas" 
+                                           moveLuva luvaEnemy3
+                                           setObjectAsleep False luvaEnemy1    
+                                           setObjectAsleep False luvaEnemy2    
+				           setObjectAsleep False luvaEnemy3 
+                                          )                                          
+                                         when(n==2) (do
+                                          luvaEnemy1 <- findObject "luva1" "luvas"
+                                          moveLuva luvaEnemy1
+				          luvaEnemy2 <- findObject "luva2" "luvas" 
+                                          moveLuva luvaEnemy2  
+                                      	  luvaEnemy3 <- findObject "luva3" "luvas" 
+                                          moveLuva luvaEnemy3 
+					  luvaEnemy4 <- findObject "luva4" "luvas"	
+                                          moveLuva luvaEnemy4
+                                          luvaEnemy6 <- findObject "luva6" "luvas" 
+                                          moveLuvaVertical luvaEnemy6 
+                                          setObjectAsleep False luvaEnemy1    
+                                          setObjectAsleep False luvaEnemy2    
+				          setObjectAsleep False luvaEnemy3
+                                          setObjectAsleep False luvaEnemy4
+                                          setObjectAsleep False luvaEnemy6       		                                  
+                                          )
+                                         when(n==3)(do
+					  luvaEnemy1 <- findObject "luva1" "luvas"
+                                          moveLuva luvaEnemy1
+				          luvaEnemy2 <- findObject "luva2" "luvas" 
+                                          moveLuva luvaEnemy2  
+                                      	  luvaEnemy3 <- findObject "luva3" "luvas" 
+                                          moveLuva luvaEnemy3
+                                          luvaEnemy4 <- findObject "luva4" "luvas" 
+                                          moveLuva luvaEnemy4
+                                          luvaEnemy5 <- findObject "luva5" "luvas" 
+                                          moveLuva luvaEnemy5
+                                          luvaEnemy6 <- findObject "luva6" "luvas" 
+                                          moveLuvaVertical luvaEnemy6
+                                          luvaEnemy7 <- findObject "luva7" "luvas" 
+                                          moveLuvaVertical luvaEnemy7                                         
+                                          setObjectAsleep False luvaEnemy1    
+                                          setObjectAsleep False luvaEnemy2    
+				          setObjectAsleep False luvaEnemy3
+                                          setObjectAsleep False luvaEnemy4    
+				          setObjectAsleep False luvaEnemy5
+                                          setObjectAsleep False luvaEnemy6    
+				          setObjectAsleep False luvaEnemy7  
+					  ) 	  						
+					 bolaPos <- getObjectPosition bola
+ 					 tile <- getTileFromWindowPosition bolaPos
  					 if((getTilePictureIndex tile)==18) 
                                            then setGameAttribute(GA timer True initPos score)
-				     	   else return () 
-				)
+				     	   else return ())
+                                           
                  
-  {-                    else if (timer == 0) -- put a new food in the map
-                             then (do food <- findObject "food" "food"
-                                      newPos <- createNewFoodPosition
-                                      setObjectPosition newPos food
-                                      newFood <- findObject "food" "food"
-                                      setObjectAsleep False newFood
-                                      setGameAttribute (GA (-1) remainingFood tailSize previousHeadPos score)
-                                      snakeHead <- findObject "head" "head"
-                                      checkSnakeCollision snakeHead )
-                             else if (timer > 0) -- there is no food in the map, so decrease the food timer
-                                   then (do setGameAttribute (GA (timer - 1) remainingFood tailSize previousHeadPos score)
-                                            snakeHead <- findObject "head" "head"
-                                            checkSnakeCollision snakeHead )
-                                   else (do -- there is a food in the map
-                                      food <- findObject "food" "food"
-                                      snakeHead <- findObject "head" "head"
-                                      col <- objectsCollision snakeHead food
-                                      if col
-                                          then (do snakeHeadPosition <- getObjectPosition snakeHead
-                                                   setGameAttribute (GA defaultTimer (remainingFood-1) (tailSize + 1) snakeHeadPosition (score + 1))
-                                                   --addTail previousHeadPos
-                                                   setObjectAsleep True food)
-                                          else checkSnakeCollision snakeHead) 
-                  showScore -}
+
 
       GameOver -> do
                       disableMapDrawing
@@ -251,26 +297,26 @@ gameCycle = do
 
 
 {-
-showScore :: WormsAction ()
+showScore :: JGMAction ()
 showScore = do
   (GA _ remainingFood _ _ score) <- getGameAttribute
   printOnScreen (printf "Score: %d    Food remaining: %d" score remainingFood) TimesRoman24 (40,8) 1.0 1.0 1.0
   showFPS TimesRoman24 (780-60,8) 1.0 0.0 0.0
 -}
-setNewMap :: Int -> WormsAction ()
+setNewMap :: Int -> JGMAction ()
 setNewMap 2 = setCurrentMapIndex 1
 setNewMap 3 = setCurrentMapIndex 2
 setNewMap _ = return ()
-
+ --tails <- getObjectsFromGroup "tail"
 --colisao com espinho é morte
 --colisão com objeto para , determinando chão
-checkSnakeCollision :: WormsObject -> WormsAction ()
-checkSnakeCollision snakeHead = do
-  headPos <- getObjectPosition snakeHead
-  tile <- getTileFromWindowPosition headPos
-  --tails <- getObjectsFromGroup "tail"
-  --col <- objectListObjectCollision tails snakeHead
-  if ((getTileBlocked tile))
+checkCollision :: JGMObject -> JGMAction ()
+checkCollision bola = do
+  bolaPos <- getObjectPosition bola
+  tile <- getTileFromWindowPosition bolaPos
+  luvas <- getObjectsFromGroup "luvas"
+  col <- objectListObjectCollision luvas bola
+  if ((getTileBlocked tile || col ))
           then (do setGameState GameOver
                    disableObjectsDrawing
                    disableObjectsMoving
@@ -279,7 +325,8 @@ checkSnakeCollision snakeHead = do
           then stop
           else return()
 
-createNewFoodPosition :: WormsAction (GLdouble,GLdouble)
+{-
+createNewFoodPosition :: JGMAction (GLdouble,GLdouble)
 createNewFoodPosition = do
   x <- randomInt (1,18)
   y <- randomInt (1,24)
@@ -289,43 +336,45 @@ createNewFoodPosition = do
       else createNewFoodPosition
   where toPixelCoord a = (tileSize/2) + (fromIntegral a) * tileSize
 
-checkMapPosition :: (Int,Int) -> WormsAction Bool
+checkMapPosition :: (Int,Int) -> JGMAction Bool
 checkMapPosition (x,y) = do
   mapTile <- getTileFromIndex (x,y)
   return (not (getTileBlocked mapTile))
-
-b,f,s,x,y,w,z,gol :: WormsTile
+-}
+b,f,s,x,y,w,z,gol :: JGMTile
 b = (border1, False,  0.0, NoTileAttribute) --cost 1 chão
-f = (free1,   False, 0.0, NoTileAttribute)
+f = (grass,   False, 0.0, NoTileAttribute)
 s = (spike,True,0.0,NoTileAttribute)
 x= (bl,False,0.0,NoTileAttribute)
 y= (br,False,0.0,NoTileAttribute)
 w= (bu,False,0.0,NoTileAttribute)
 z= (bd,False,0.0,NoTileAttribute)
-gol = (elephant,False,0.0,NoTileAttribute)
-map1 :: WormsMap
-map1 = [[b,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,b],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,s,s,s,s,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,gol,y],
-        [b,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,b]]
+gol = (barra,False,0.0,NoTileAttribute)
 
-map2 :: WormsMap
+
+map1 :: JGMMap
+map1 = [[s,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,s],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,s,s,s,s,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,gol,y],
+        [s,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,s]]
+
+map2 :: JGMMap
 map2 = [[b,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,b],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
@@ -334,7 +383,7 @@ map2 = [[b,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,b],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,s,s,s,s,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,gol,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
@@ -347,7 +396,7 @@ map2 = [[b,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,b],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [b,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,b]]
 
-map3 :: WormsMap
+map3 :: JGMMap
 map3 = [[b,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,b],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
@@ -361,9 +410,9 @@ map3 = [[b,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,b],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,s,s,s,s,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
-        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
+        [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,s,s,s,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,gol,f,y],
         [x,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,y],
