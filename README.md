@@ -1,13 +1,14 @@
-# Game-Haskell
+# game-soccer-in-recife
 Game developed using fungen game engine/framework.
 More information about fungen: https://github.com/haskell-game/fungen
 
 Your challenge is to take a multi-level goal, to challenge all levels of the game.
-The game has a special mood for the people live in Recife. 
+The game has a special mood for the people than live in Recife. 
 
-Ball Movement Keys: Keyboard - Arrows
+Movement Ball: Arrow Keys
 
-Execute game with the commands :
+Execute the game with commands :
+
     $ cd haskell-game-soccer-in-recife
     $ cabal run fungen-jgm
     
