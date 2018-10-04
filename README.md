@@ -1,5 +1,5 @@
 # Game-Haskell
-Game developed using library fungen(write in haskell).
+Game developed using fungen game engine/framework.
 More information about fungen: https://github.com/haskell-game/fungen
 
 Your challenge is to take a multi-level goal, to challenge all levels of the game.
