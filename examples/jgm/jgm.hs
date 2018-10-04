@@ -1,7 +1,5 @@
-
 module Main where
 
-import Text.Printf
 import Graphics.UI.Fungen
 import Graphics.Rendering.OpenGL (GLdouble)
 import Paths_FunGEn (getDataFileName)
@@ -133,19 +131,18 @@ createInimigos = let luva = Tex (tileSize*1.5,tileSize*1.3) 8
               (object "luva5" luva True (45.0,305.0) (40,0) NoObjectAttribute),
 	      (object "luva6" luva True (205.0,305.0) (0,40) NoObjectAttribute),
 	      (object "luva7" luva True (405.0,540.0) (0,40) NoObjectAttribute),
-              (object "luva7" luva True (405.0,540.0) (0,40) NoObjectAttribute),
               (object "messi" messi True (205.0,300.0) (60,60) NoObjectAttribute)] 
 
 moveInimigoH:: JGMObject -> JGMAction()
 moveInimigoH inimigo = do 
-	      col1 <- objectLeftMapCollision inimigo
-              col2 <- objectRightMapCollision inimigo
+	      col1 <- objectLeftMapFutureCollision inimigo
+              col2 <- objectRightMapFutureCollision inimigo
               when (col1 || col2) (reverseXSpeed inimigo)
      
 moveInimigoV :: JGMObject -> JGMAction()
 moveInimigoV inimigo = do
-	col1 <- objectTopMapCollision inimigo
-        col2 <- objectBottomMapCollision inimigo
+	col1 <- objectTopMapFutureCollision inimigo
+        col2 <- objectBottomMapFutureCollision inimigo
 	when (col1 || col2) (reverseYSpeed inimigo)  	
 
 moveInimigoEspecial :: JGMObject -> JGMAction()
@@ -371,7 +368,6 @@ checkCollision bola = do
   v <- getObjectSpeed bola
   
   when ((getTilePictureIndex tile)==16) (setObjectSpeed ((fst v)*0.7,(snd v)*0.7) bola)
-  --when ((getTilePictureIndex tile)==17) (setObjectSpeed (speedMod-15,0) bola) 
 
   if ((getTileBlocked tile || col ))
           then (do setGameState GameOver
